@@ -1,3 +1,3 @@
-# ESP32 PWM Test Project
+# esp32
 
-PlatformIO project for ESP32 PWM testing.
+ESP32 PWM Test Project - PlatformIO project for ESP32 PWM testing.
