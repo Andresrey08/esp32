@@ -1,8 +1,22 @@
 const fs = require('fs');
 const path = require('path');
 
-// Leer archivo TSV
-const datos = fs.readFileSync(path.join(__dirname, 'Untitled-2.tsv'), 'utf-8');
+// Buscar el último archivo device-monitor
+const archivos = fs.readdirSync(__dirname)
+  .filter(f => f.startsWith('device-monitor-') && f.endsWith('.log'))
+  .sort()
+  .reverse();
+
+if (archivos.length === 0) {
+  console.error('❌ No se encontraron archivos device-monitor-*.log');
+  process.exit(1);
+}
+
+const archivoReciente = archivos[0];
+console.log(`📁 Usando archivo: ${archivoReciente}`);
+
+// Leer archivo
+const datos = fs.readFileSync(path.join(__dirname, archivoReciente), 'utf-8');
 const lineas = datos.trim().split('\n');
 
 // Parsear datos

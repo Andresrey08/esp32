@@ -21,7 +21,7 @@ float angleX = 0, angleY = 0;
 float angleX_prev = 0, angleY_prev = 0;
 
 // ==== Variables del sensor de corriente ACS712 ====
-float currentOffset = 2375;  // Valor ADC calibrado en corriente cero
+float currentOffset = 2387.06;  // Valor ADC calibrado en corriente cero
 const float ACS712_SENSITIVITY = 0.066;  // 66mV/A para ACS712-30A
 const float ADC_VOLTAGE = 3.3;           // Voltaje de referencia del ADC del ESP32
 const int ADC_RESOLUTION = 4096;         // Resolución del ADC (12 bits)
@@ -35,7 +35,7 @@ double pidOutput = 0.0;
 // Parámetros PID
 #define KP 31.1
 #define KI 0
-#define KD 1.2
+#define KD 0.6
 
 #define ALPHA 0.9975f
 

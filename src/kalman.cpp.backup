@@ -20,8 +20,23 @@ volatile unsigned long lastReadMicros = 0;
 float angleX = 0, angleY = 0;
 float angleX_prev = 0, angleY_prev = 0;
 
+// ==== Variables del Filtro de Kalman ====
+// Estado: ángulo y bias del giroscopio
+float kalman_angle_x = 0;    // Ángulo estimado X
+float kalman_bias_x = 0;     // Bias del giroscopio X
+float kalman_P_x[2][2] = {{1, 0}, {0, 1}};  // Matriz de covarianza del error
+
+float kalman_angle_y = 0;    // Ángulo estimado Y
+float kalman_bias_y = 0;     // Bias del giroscopio Y
+float kalman_P_y[2][2] = {{1, 0}, {0, 1}};  // Matriz de covarianza del error
+
+// Parámetros del filtro de Kalman
+const float Q_angle = 0.00005;  // Varianza del proceso para el ángulo
+const float Q_bias = 0.0001;   // Varianza del proceso para el bias
+const float R_measure = 0.05; // Varianza de la medición del acelerómetro
+
 // ==== Variables del sensor de corriente ACS712 ====
-float currentOffset = 2375;  // Valor ADC calibrado en corriente cero
+float currentOffset = 2387.06;  // Valor ADC calibrado en corriente cero
 const float ACS712_SENSITIVITY = 0.066;  // 66mV/A para ACS712-30A
 const float ADC_VOLTAGE = 3.3;           // Voltaje de referencia del ADC del ESP32
 const int ADC_RESOLUTION = 4096;         // Resolución del ADC (12 bits)
@@ -33,11 +48,50 @@ double pidInput = 0.0;
 double pidOutput = 0.0;
 
 // Parámetros PID
-#define KP 31.1
-#define KI 0
-#define KD 1.2
+#define KP 22
+#define KI 0.1
+#define KD 0.05
 
 #define ALPHA 0.9975f
+
+// ==== Función del Filtro de Kalman ====
+void kalmanUpdate(float &angle, float &bias, float P[2][2], float newAngle, float newRate, float dt) {
+  // Paso 1: Predicción
+  // Actualizar estimación del ángulo con la tasa del giroscopio
+  float rate = newRate - bias;
+  angle += dt * rate;
+  
+  // Actualizar matriz de covarianza del error
+  P[0][0] += dt * (dt * P[1][1] - P[0][1] - P[1][0] + Q_angle);
+  P[0][1] -= dt * P[1][1];
+  P[1][0] -= dt * P[1][1];
+  P[1][1] += Q_bias * dt;
+  
+  // Paso 2: Actualización (corrección con medición del acelerómetro)
+  // Innovación: diferencia entre medición y predicción
+  float y = newAngle - angle;
+  
+  // Covarianza de la innovación
+  float S = P[0][0] + R_measure;
+  
+  // Ganancia de Kalman
+  float K[2];
+  K[0] = P[0][0] / S;
+  K[1] = P[1][0] / S;
+  
+  // Actualizar estimación con la ganancia de Kalman
+  angle += K[0] * y;
+  bias += K[1] * y;
+  
+  // Actualizar matriz de covarianza del error
+  float P00_temp = P[0][0];
+  float P01_temp = P[0][1];
+  
+  P[0][0] -= K[0] * P00_temp;
+  P[0][1] -= K[0] * P01_temp;
+  P[1][0] -= K[1] * P00_temp;
+  P[1][1] -= K[1] * P01_temp;
+}
 
 // Crear controlador PID
 PID myPID(&pidInput, &pidOutput, &setpoint, KP, KI, KD, DIRECT);
@@ -101,12 +155,12 @@ void loop() {
   float accelX = atan2f(ay, sqrtf(ax * ax + az * az)) * 180.0f / M_PI;
   float accelY = atan2f(-ax, sqrtf(ay * ay + az * az)) * 180.0f / M_PI;
 
-  // Filtro complementario - gx, gy, gz ya están en grados/s
-  angleX = ALPHA * (angleX_prev + gx * dt) + (1 - ALPHA) * accelX;
-  angleY = ALPHA * (angleY_prev + gy * dt) + (1 - ALPHA) * accelY;
-  angleX_prev = angleX;
-  angleY_prev = angleY;
-  angleX = angleX - 3;
+  // Aplicar Filtro de Kalman (reemplaza filtro complementario)
+  kalmanUpdate(kalman_angle_x, kalman_bias_x, kalman_P_x, accelX, gx, dt);
+  kalmanUpdate(kalman_angle_y, kalman_bias_y, kalman_P_y, accelY, gy, dt);
+  
+  angleX = kalman_angle_x - 5;  // Aplicar corrección de offset
+  angleY = kalman_angle_y;
   
   // Actualizar entrada del PID y calcular
   pidInput = angleX;
